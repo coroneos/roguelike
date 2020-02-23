@@ -11,5 +11,20 @@ struct Tcod {
 }
 
 fn main() {
-    println!("Hello, world!");
+    let root = Root::initializer()
+        .font("terminal16x16_gs_ro.png", FontLayout::Tcod)
+        .font_type(FontType::Greyscale)
+        .size(SCREEN_WIDTH, SCREEN_HEIGHT)
+        .title("Rust/libtcod tutorial")
+        .init();
+
+    while !tcod.root.window_closed() {
+        tcod.root.set_default_foreground(WHITE);
+        tcod.root.clear();
+        tcod.root.put_char(1, 1, '@', BackgroundFlag::None);
+        tcod.root.flush();
+        tcod.root.wait_for_keypress(true);
+    }
+
+    let mut tcod = Tcod { root };
 }
