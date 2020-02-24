@@ -1,5 +1,10 @@
 // Place your settings in this file to overwrite the default settings
 {
+  "editor.rulers": [
+    80,
+    120,
+    160
+  ],
   // "workbench.colorTheme": "Blink Contrast (rainglow)"
   // "workbench.colorTheme": "Bold Contrast (rainglow)"
   // "workbench.colorTheme": "Box UK Contrast (rainglow)"
