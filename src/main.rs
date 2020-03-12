@@ -1,5 +1,8 @@
-use rand::Rng;
+// Roguelike Tutorial
+
 use std::cmp;
+
+use rand::Rng;
 use tcod::colors::*;
 use tcod::console::*;
 use tcod::map::{FovAlgorithm, Map as FovMap};
@@ -12,7 +15,7 @@ const SCREEN_HEIGHT: i32 = 50;
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 45;
 
-// parameters for dungeon generator
+//parameters for dungeon generator
 const ROOM_MAX_SIZE: i32 = 10;
 const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
@@ -22,7 +25,7 @@ const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic; // default FOV algorithm
 const FOV_LIGHT_WALLS: bool = true; // light walls or not
 const TORCH_RADIUS: i32 = 10;
 
-const LIMIT_FPS: i32 = 20;
+const LIMIT_FPS: i32 = 20; // 20 frames-per-second maximum
 
 const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
 const COLOR_LIGHT_WALL: Color = Color {
@@ -127,6 +130,8 @@ struct Object {
     name: String,
     blocks: bool,
     alive: bool,
+    fighter: Option<Fighter>,
+    ai: Option<Ai>,
 }
 
 impl Object {
@@ -139,6 +144,8 @@ impl Object {
             name: name.into(),
             blocks: blocks,
             alive: false,
+            fighter: None,
+            ai: None,
         }
     }
 
@@ -156,6 +163,13 @@ impl Object {
         self.x = x;
         self.y = y;
     }
+
+    /// return the distance to another object
+    pub fn distance_to(&self, other: &Object) -> f32 {
+        let dx = other.x - self.x;
+        let dy = other.y - self.y;
+        ((dx.pow(2) + dy.pow(2)) as f32).sqrt()
+    }
 }
 
 /// move by the given amount, if the destination is not blocked
@@ -164,6 +178,19 @@ fn move_by(id: usize, dx: i32, dy: i32, map: &Map, objects: &mut [Object]) {
     if !is_blocked(x + dx, y + dy, map, objects) {
         objects[id].set_pos(x + dx, y + dy);
     }
+}
+
+fn move_towards(id: usize, target_x: i32, target_y: i32, map: &Map, objects: &mut [Object]) {
+    // vector from this object to the target, and distance
+    let dx = target_x - objects[id].x;
+    let dy = target_y - objects[id].y;
+    let distance = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
+
+    // normalize it to length 1 (preserving direction), then round it and
+    // convert to integer so the movement is restricted to the map grid
+    let dx = (dx as f32 / distance).round() as i32;
+    let dy = (dy as f32 / distance).round() as i32;
+    move_by(id, dx, dy, map, objects);
 }
 
 fn is_blocked(x: i32, y: i32, map: &Map, objects: &[Object]) -> bool {
@@ -175,6 +202,39 @@ fn is_blocked(x: i32, y: i32, map: &Map, objects: &[Object]) -> bool {
     objects
         .iter()
         .any(|object| object.blocks && object.pos() == (x, y))
+}
+
+// combat-related properties and methods (monster, player, NPC).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Fighter {
+    max_hp: i32,
+    hp: i32,
+    defense: i32,
+    power: i32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Ai {
+    Basic,
+}
+
+fn ai_take_turn(monster_id: usize, tcod: &Tcod, game: &Game, objects: &mut [Object]) {
+    // a basic monster takes its turn. If you can see it, it can see you
+    let (monster_x, monster_y) = objects[monster_id].pos();
+    if tcod.fov.is_in_fov(monster_x, monster_y) {
+        if objects[monster_id].distance_to(&objects[PLAYER]) >= 2.0 {
+            // move towards player if far away
+            let (player_x, player_y) = objects[PLAYER].pos();
+            move_towards(monster_id, player_x, player_y, &game.map, objects);
+        } else if objects[PLAYER].fighter.map_or(false, |f| f.hp > 0) {
+            // close enough, attack! (if the player is still alive.)
+            let monster = &objects[monster_id];
+            println!(
+                "The attack of the {} bounces off your shiny metal armor!",
+                monster.name
+            );
+        }
+    }
 }
 
 fn create_room(room: Rect, map: &mut Map) {
@@ -201,7 +261,7 @@ fn create_v_tunnel(y1: i32, y2: i32, x: i32, map: &mut Map) {
 }
 
 fn make_map(objects: &mut Vec<Object>) -> Map {
-    // fill map with "unblocked" tiles
+    // fill map with "blocked" tiles
     let mut map = vec![vec![Tile::wall(); MAP_HEIGHT as usize]; MAP_WIDTH as usize];
 
     let mut rooms = vec![];
@@ -277,10 +337,26 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<Object>) {
             let mut monster = if rand::random::<f32>() < 0.8 {
                 // 80% chance of getting an orc
                 // create an orc
-                Object::new(x, y, 'o', "orc", DESATURATED_GREEN, true)
+                let mut orc = Object::new(x, y, 'o', "orc", DESATURATED_GREEN, true);
+                orc.fighter = Some(Fighter {
+                    max_hp: 10,
+                    hp: 10,
+                    defense: 0,
+                    power: 3,
+                });
+                orc.ai = Some(Ai::Basic);
+                orc
             } else {
                 // create a troll
-                Object::new(x, y, 'T', "troll", DARKER_GREEN, true)
+                let mut troll = Object::new(x, y, 'T', "troll", DARKER_GREEN, true);
+                troll.fighter = Some(Fighter {
+                    max_hp: 16,
+                    hp: 16,
+                    defense: 1,
+                    power: 4,
+                });
+                troll.ai = Some(Ai::Basic);
+                troll
             };
             monster.alive = true;
             objects.push(monster);
@@ -309,6 +385,7 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recomput
                 (true, true) => COLOR_LIGHT_WALL,
                 (true, false) => COLOR_LIGHT_GROUND,
             };
+
             let explored = &mut game.map[x as usize][y as usize].explored;
             if visible {
                 // since it's visible, explore it
@@ -329,7 +406,7 @@ fn render_all(tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recomput
         }
     }
 
-    // blit the contents of "con" to the root console and present it
+    // blit the contents of "con" to the root console
     blit(
         &tcod.con,
         (0, 0),
@@ -388,7 +465,6 @@ fn handle_keys(tcod: &mut Tcod, game: &Game, objects: &mut Vec<Object>) -> Playe
         (Key { code: Escape, .. }, _, _) => Exit, // exit game
 
         // movement keys
-        // movement keys
         (Key { code: Up, .. }, _, true) => {
             player_move_or_attack(0, -1, game, objects);
             TookTurn
@@ -421,7 +497,7 @@ fn main() {
     tcod::system::set_fps(LIMIT_FPS);
 
     let root = Root::initializer()
-        .font("assets/arial10x10.png", FontLayout::Tcod)
+        .font("arial10x10.png", FontLayout::Tcod)
         .font_type(FontType::Greyscale)
         .size(SCREEN_WIDTH, SCREEN_HEIGHT)
         .title("Rust/libtcod tutorial")
@@ -436,6 +512,12 @@ fn main() {
     // create object representing the player
     let mut player = Object::new(0, 0, '@', "player", WHITE, true);
     player.alive = true;
+    player.fighter = Some(Fighter {
+        max_hp: 30,
+        hp: 30,
+        defense: 2,
+        power: 5,
+    });
 
     // the list of objects with just the player
     let mut objects = vec![player];
@@ -479,10 +561,9 @@ fn main() {
 
         // let monsters take their turn
         if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
-            for object in &objects {
-                // only if object is not player
-                if (object as *const _) != (&objects[PLAYER] as *const _) {
-                    println!("The {} growls!", object.name);
+            for id in 0..objects.len() {
+                if objects[id].ai.is_some() {
+                    ai_take_turn(id, &tcod, &game, &mut objects);
                 }
             }
         }
