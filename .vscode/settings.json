@@ -1,8 +1,8 @@
 // Place your settings in this file to overwrite the default settings
 {
   "editor.rulers": [
-    80,
-    120
+    // 80,
+    // 120
   ],
   // "workbench.colorTheme": "Blink Contrast (rainglow)"
   // "workbench.colorTheme": "Bold Contrast (rainglow)"
@@ -14,6 +14,8 @@
   // "workbench.colorTheme": "Fodder Contrast (rainglow)"
   // "workbench.colorTheme": "Frantic Contrast (rainglow)"
   // "workbench.colorTheme": "Gloom Contrast (rainglow)"
+  "workbench.colorTheme": "Glowfish (rainglow)"
+  // "workbench.colorTheme": "Glowfish Contrast (rainglow)"
   // "workbench.colorTheme": "Halflife Contrast (rainglow)"
   // "workbench.colorTheme": "Laravel Contrast (rainglow)"
   // "workbench.colorTheme": "Legacy Contrast (rainglow)"
@@ -22,7 +24,7 @@
   // "workbench.colorTheme": "Overflow Contrast (rainglow)"
   // "workbench.colorTheme": "Peacocks In Space Contrast (rainglow)"
   // "workbench.colorTheme": "Penitent Contrast (rainglow)"
-  "workbench.colorTheme": "Rebellion Contrast (rainglow)"
+  // "workbench.colorTheme": "Tron Contrast (rainglow)"
   // "workbench.colorTheme": "Scorch Contrast (rainglow)"
   // "workbench.colorTheme": "Service Contrast (rainglow)"
   // "workbench.colorTheme": "Spitfire Contrast (rainglow)"
